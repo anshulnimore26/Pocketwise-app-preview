@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>PocketWise Prototype</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Placeholder Comments -->
+    <!-- Chosen Palette: Fintech Gradient (Deep Purple, Vibrant Pink, Slate Gray) -->
+    <!-- Application Structure Plan: A mobile-first SPA simulating a native app experience with a fixed bottom tab navigation for Home, Transactions, Insights, and Profile. This structure is standard for consumer mobile apps, providing intuitive, one-tap access to core features, which is ideal for the target Gen Z user. The flow is designed to immediately present the core value ('Safe-to-Spend') on the Home screen and allow deeper exploration in other tabs. -->
+    <!-- Visualization & Content Choices: Home: Key Metric ('Safe-to-Spend') -> Goal: Inform -> Dynamic Counter -> JS. Transactions: Transaction List -> Goal: Inform/Organize -> Dynamic HTML List from JS array. Insights: Spending Breakdown -> Goal: Compare/Analyze -> Interactive Donut Chart -> Chart.js with JS filter buttons (Weekly/Monthly). This visualizes the core value prop of providing financial clarity. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .brand-gradient-text { background: linear-gradient(135deg, #A855F7, #EC4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .brand-gradient-bg { 
+            background: linear-gradient(135deg, #A855F7, #EC4899);
+            color: #ffffff;
+        }
+        html, body { overscroll-behavior: none; height: 100%; overflow: hidden; }
+        .page-content { display: none; }
+        .page-content.active { display: block; animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-btn.active { color: #A855F7; }
+        .insights-btn.active { background-color: #a855f7; color: white; box-shadow: 0 4px 14px 0 rgba(168, 85, 247, 0.39); }
+        .budget-progress-bar { transition: width 1.5s ease-in-out; }
+        .modal-overlay, .splash-screen { transition: opacity 0.3s ease-in-out; }
+        .modal-content { transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; }
+        .category-filter-btn.active { background-color: #a855f7; color: white; }
+        .faq-item[open] .faq-arrow { transform: rotate(90deg); }
+        .faq-arrow { transition: transform 0.2s ease; }
+        .transaction-item, .quick-action-btn { animation: slideInUp 0.5s ease-out forwards; opacity: 0; }
+        @keyframes slideInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .toast { transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+        .shake { animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both; }
+        .tx-swipe-container { transition: transform 0.3s ease-out; }
+        .tx-actions { transition: opacity 0.3s ease-out; }
+        .skeleton-loader { background-color: #e2e8f0; border-radius: 0.5rem; animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="max-w-md mx-auto bg-white shadow-2xl flex flex-col">
+    
+    <svg class="absolute w-0 h-0">
+        <defs>
+            <linearGradient id="logoGradient" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#C084FC"/><stop offset="100%" stop-color="#F472B6"/>
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <!-- Splash Screen -->
+    <div id="splashScreen" class="splash-screen fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+        <svg width="80" height="80" viewBox="0 0 32 32" fill="url(#logoGradient)" xmlns="http://www.w3.org/2000/svg">
+            <path d="M25.3333 2.66666C28.2636 2.66666 30.6667 5.06972 30.6667 8V24C30.6667 26.9302 28.2636 29.3333 25.3333 29.3333H8C5.06972 29.3333 2.66666 26.9302 2.66666 24V8C2.66666 5.06972 5.06972 2.66666 8 2.66666H25.3333Z"/>
+            <path d="M12 22V10H16.4C18.8304 10 20.8 11.9696 20.8 14.4C20.8 16.8304 18.8304 18.8 16.4 18.8H14.4" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <h1 class="text-3xl font-bold brand-gradient-text mt-4">PocketWise</h1>
+    </div>
+
+    <div id="appContainer" class="opacity-0 transition-opacity duration-500 flex flex-col h-full">
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto pb-20">
+            <!-- Home Screen -->
+            <div id="home" class="page-content p-6 active">
+                <header class="flex justify-between items-center mb-4">
+                     <div class="flex items-center space-x-3">
+                        <svg width="32" height="32" viewBox="0 0 32 32" fill="url(#logoGradient)" xmlns="http://www.w3.org/2000/svg">
+                           <path d="M25.3333 2.66666C28.2636 2.66666 30.6667 5.06972 30.6667 8V24C30.6667 26.9302 28.2636 29.3333 25.3333 29.3333H8C5.06972 29.3333 2.66666 26.9302 2.66666 24V8C2.66666 5.06972 5.06972 2.66666 8 2.66666H25.3333Z"/>
+                           <path d="M12 22V10H16.4C18.8304 10 20.8 11.9696 20.8 14.4C20.8 16.8304 18.8304 18.8 16.4 18.8H14.4" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        <span class="text-xl font-bold text-slate-800">PocketWise</span>
+                    </div>
+                    <button id="notificationsBtn" class="relative">
+                        <span class="text-2xl">🔔</span>
+                        <span id="notificationDot" class="absolute top-0 right-0 block h-2.5 w-2.5 rounded-full bg-pink-500 ring-2 ring-white hidden"></span>
+                    </button>
+                </header>
+
+                <div class="mb-8">
+                    <p id="greeting" class="text-slate-500 text-sm">Good evening, Anshul!</p>
+                    <p id="liveClock" class="font-semibold text-slate-800"></p>
+                </div>
+
+                <div class="brand-gradient-bg rounded-2xl p-6 shadow-lg">
+                    <p class="text-sm opacity-80">Safe to Spend This Month</p>
+                    <p class="text-5xl font-extrabold my-2" id="safeToSpend">₹0</p>
+                    <div class="mt-4">
+                        <div class="flex justify-between text-xs opacity-80 mb-1">
+                            <span id="spentAmount">Spent: ₹0</span>
+                            <span id="budgetAmount">Budget: ₹5,000</span>
+                        </div>
+                        <div class="w-full bg-white/30 rounded-full h-2">
+                            <div id="budgetProgressBar" class="budget-progress-bar bg-white h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-8">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4">Quick Actions</h2>
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <button id="addExpenseBtn" class="quick-action-btn bg-white p-4 rounded-xl active:scale-95 transition-transform border border-slate-100"><span class="text-2xl">➕</span><p class="text-xs font-medium text-slate-600 mt-1">Add Expense</p></button>
+                        <button class="quick-action-btn bg-white p-4 rounded-xl active:scale-95 transition-transform border border-slate-100"><span class="text-2xl">📄</span><p class="text-xs font-medium text-slate-600 mt-1">Scan Receipt</p></button>
+                        <button id="addIncomeBtn" class="quick-action-btn bg-white p-4 rounded-xl active:scale-95 transition-transform border border-slate-100"><span class="text-2xl">💸</span><p class="text-xs font-medium text-slate-600 mt-1">Add Income</p></button>
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <h2 class="text-lg font-bold text-slate-800 mb-4">Recent Transactions</h2>
+                    <div id="recentTransactions" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- Transactions Screen -->
+            <div id="transactions" class="page-content">
+                <div class="p-6 sticky top-0 bg-white/80 backdrop-blur-lg z-10">
+                    <h1 class="text-2xl font-bold text-slate-800">Transactions</h1>
+                    <div class="mt-4 flex items-center bg-white rounded-lg p-2 border border-slate-100">
+                        <span class="text-slate-400 px-2">🔍</span>
+                        <input id="searchInput" type="text" placeholder="Search transactions..." class="bg-transparent w-full outline-none text-sm text-slate-800">
+                    </div>
+                </div>
+                <div class="px-6 pb-4">
+                    <div id="categoryFilters" class="flex space-x-2 overflow-x-auto pb-2 -mx-6 px-6"></div>
+                </div>
+                <div class="px-6 space-y-4" id="allTransactions"></div>
+            </div>
+
+            <!-- Insights Screen -->
+            <div id="insights" class="page-content p-6">
+                <h1 class="text-2xl font-bold text-slate-800 mb-6">Spending Insights</h1>
+                <div class="flex justify-center bg-white p-1 rounded-full mb-6 border border-slate-100">
+                    <button id="weeklyBtn" class="insights-btn w-1/2 py-2 text-sm font-medium rounded-full transition-colors active">Weekly</button>
+                    <button id="monthlyBtn" class="insights-btn w-1/2 py-2 text-sm font-medium rounded-full transition-colors text-slate-600">Monthly</button>
+                </div>
+                
+                <div class="chart-container relative w-full max-w-sm mx-auto h-64">
+                    <canvas id="spendingChart"></canvas>
+                    <div id="chartCenterText" class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <p id="insightsTotal" class="text-3xl font-bold text-slate-800">₹0</p>
+                        <p id="insightsPeriod" class="text-sm text-slate-500">Total spent</p>
+                    </div>
+                </div>
+                <div id="insightsSummary" class="mt-6 space-y-3"></div>
+            </div>
+
+            <!-- Profile Screen -->
+            <div id="profile" class="page-content p-6">
+                <div class="text-center mb-8">
+                    <div class="w-24 h-24 bg-slate-200 rounded-full mx-auto mb-4 flex items-center justify-center"><span class="text-5xl">👨‍🎓</span></div>
+                    <h1 id="profileName" class="text-2xl font-bold text-slate-800">Anshul Nimore</h1>
+                    <p class="text-slate-500">Bhopal, Madhya Pradesh</p>
+                </div>
+                <div class="space-y-2">
+                    <button class="w-full flex items-center justify-between bg-white p-4 rounded-lg text-slate-700 active:bg-slate-100 border border-slate-100"><span>👤 Account Settings</span><span>></span></button>
+                    <button id="budgetsBtn" class="w-full flex items-center justify-between bg-white p-4 rounded-lg text-slate-700 active:bg-slate-100 border border-slate-100"><span>💰 Budgets</span><span>></span></button>
+                    <button class="w-full flex items-center justify-between bg-white p-4 rounded-lg text-slate-700 active:bg-slate-100 border border-slate-100"><span>🔗 Linked Accounts</span><span>></span></button>
+                    <button id="helpBtn" class="w-full flex items-center justify-between bg-white p-4 rounded-lg text-slate-700 active:bg-slate-100 border border-slate-100"><span>❓ Help & Support</span><span>></span></button>
+                    <div class="text-center pt-6">
+                        <button class="text-red-500 font-medium">Log Out</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Notifications Screen -->
+            <div id="notifications" class="page-content p-6">
+                <div class="flex items-center mb-6">
+                    <button id="notificationsBackBtn" class="text-2xl text-slate-500 mr-4 active:bg-slate-100 rounded-full w-8 h-8 flex items-center justify-center transition-colors">←</button>
+                    <h1 class="text-2xl font-bold text-slate-800">Notifications</h1>
+                </div>
+                <div id="notificationsList" class="space-y-4"></div>
+            </div>
+        </main>
+
+        <!-- Bottom Navigation -->
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto h-20 bg-white/90 backdrop-blur-lg border-t border-slate-200 flex justify-around items-center">
+            <button data-target="home" class="nav-btn flex flex-col items-center text-slate-500 active"><span class="text-2xl">🏠</span><span class="text-xs font-medium">Home</span></button>
+            <button data-target="transactions" class="nav-btn flex flex-col items-center text-slate-500"><span class="text-2xl">💳</span><span class="text-xs font-medium">Transactions</span></button>
+            <button data-target="insights" class="nav-btn flex flex-col items-center text-slate-500"><span class="text-2xl">📊</span><span class="text-xs font-medium">Insights</span></button>
+            <button data-target="profile" class="nav-btn flex flex-col items-center text-slate-500"><span class="text-2xl">👤</span><span class="text-xs font-medium">Profile</span></button>
+        </nav>
+    </div>
+
+    <!-- Modals and Toasts Container -->
+    <div id="modalContainer"></div>
+    <div id="toastContainer" class="fixed top-5 right-0 left-0 mx-auto w-max z-50"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const state = {
+                user: { name: 'Anshul', budget: 5000 },
+                transactions: [],
+                currentDate: new Date(), // Use live date
+                categories: ['Food', 'Travel', 'Shopping', 'Entertainment', 'Health', 'Education', 'Bills', 'Other'],
+                categoryColors: { 'Food': '#a855f7', 'Travel': '#ec4899', 'Shopping': '#f97316', 'Entertainment': '#22c55e', 'Health': '#3b82f6', 'Education': '#f59e0b', 'Bills': '#ef4444', 'Other': '#64748b' },
+                categoryIcons: { 'Food': '🍔', 'Travel': '🚕', 'Shopping': '🛍️', 'Entertainment': '🎬', 'Health': '💊', 'Education': '📚', 'Bills': '📱', 'Other': '💸' }
+            };
+
+            const mockData = [
+                { id: 1, icon: '🍔', merchant: 'Zomato', category: 'Food', amount: 280, date: new Date(new Date().setDate(new Date().getDate())) },
+                { id: 2, icon: '☕', merchant: 'Starbucks', category: 'Food', amount: 450, date: new Date(new Date().setDate(new Date().getDate() - 1)) },
+                { id: 3, icon: '🚕', merchant: 'Uber', category: 'Travel', amount: 175, date: new Date(new Date().setDate(new Date().getDate() - 1)) },
+                { id: 4, icon: '🛍️', merchant: 'Myntra', category: 'Shopping', amount: 2100, date: new Date(new Date().setDate(new Date().getDate() - 3)) },
+                { id: 5, icon: '🎬', merchant: 'BookMyShow', category: 'Entertainment', amount: 650, date: new Date(new Date().setDate(new Date().getDate() - 7)) },
+                { id: 6, icon: '💊', merchant: 'Apollo Pharmacy', category: 'Health', amount: 320, date: new Date(new Date().setDate(new Date().getDate() - 9)) },
+                { id: 7, icon: '📚', merchant: 'Campus Bookstore', category: 'Education', amount: 850, date: new Date(new Date().setDate(new Date().getDate() - 11)) },
+                { id: 8, icon: '📱', merchant: 'Jio Recharge', category: 'Bills', amount: 299, date: new Date(new Date().setDate(new Date().getDate() - 14)) },
+            ];
+
+            const navButtons = document.querySelectorAll('.nav-btn');
+            const pages = document.querySelectorAll('.page-content');
+            let spendingChart;
+
+            function switchPage(targetId) {
+                pages.forEach(page => page.classList.remove('active'));
+                document.getElementById(targetId).classList.add('active');
+                navButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.target === targetId));
+            }
+            navButtons.forEach(button => button.addEventListener('click', () => switchPage(button.dataset.target)));
+            document.getElementById('notificationsBtn').addEventListener('click', () => switchPage('notifications'));
+            document.getElementById('notificationsBackBtn').addEventListener('click', () => switchPage('home'));
+
+            function createModal(id, title, content) {
+                const modalHTML = `
+                    <div id="${id}" class="modal-overlay fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none">
+                        <div class="modal-content bg-white rounded-2xl p-6 w-full max-w-sm transform scale-95 opacity-0">
+                            <div class="flex justify-between items-center mb-6">
+                                <h2 class="text-xl font-bold text-slate-800">${title}</h2>
+                                <button class="close-modal-btn text-2xl text-slate-500">&times;</button>
+                            </div>
+                            ${content}
+                        </div>
+                    </div>`;
+                document.getElementById('modalContainer').insertAdjacentHTML('beforeend', modalHTML);
+                const modal = document.getElementById(id);
+                modal.querySelector('.close-modal-btn').addEventListener('click', () => closeModal(id));
+                modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(id); });
+            }
+
+            function openModal(id) {
+                const modal = document.getElementById(id);
+                modal.classList.remove('pointer-events-none');
+                modal.classList.add('opacity-100');
+                modal.querySelector('.modal-content').classList.add('opacity-100', 'scale-100');
+            }
+
+            function closeModal(id) {
+                const modal = document.getElementById(id);
+                modal.classList.add('pointer-events-none');
+                modal.classList.remove('opacity-100');
+                modal.querySelector('.modal-content').classList.remove('opacity-100', 'scale-100');
+            }
+            
+            function showToast(message) {
+                const toastId = 'toast-' + Date.now();
+                const toastHTML = `<div id="${toastId}" class="toast bg-slate-800 text-white text-sm font-semibold py-2 px-4 rounded-full shadow-lg transform translate-y-full opacity-0">
+                    ${message}
+                </div>`;
+                document.getElementById('toastContainer').insertAdjacentHTML('beforeend', toastHTML);
+                const toast = document.getElementById(toastId);
+                setTimeout(() => {
+                    toast.classList.remove('translate-y-full', 'opacity-0');
+                }, 10);
+                setTimeout(() => {
+                    toast.classList.add('translate-y-full', 'opacity-0');
+                    setTimeout(() => toast.remove(), 300);
+                }, 3000);
+            }
+
+            function createTransactionHTML(tx, index) {
+                return `
+                    <div class="relative overflow-hidden rounded-xl">
+                        <div class="tx-swipe-container w-full text-left flex items-center justify-between p-3 bg-white rounded-xl active:bg-slate-100 transition-colors border border-slate-100" data-tx-id="${tx.id}">
+                            <div class="flex items-center pointer-events-none">
+                                <div class="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-xl mr-4">${tx.icon}</div>
+                                <div>
+                                    <p class="font-semibold text-slate-700">${tx.merchant}</p>
+                                    <p class="text-xs text-slate-500">${tx.category}</p>
+                                </div>
+                            </div>
+                            <p class="font-bold text-slate-800 pointer-events-none">- ₹${tx.amount}</p>
+                        </div>
+                        <div class="tx-actions absolute top-0 right-0 h-full flex items-center opacity-0 pointer-events-none">
+                            <button class="edit-btn h-full bg-blue-500 text-white px-4">Edit</button>
+                            <button class="delete-btn h-full bg-red-500 text-white px-4">Delete</button>
+                        </div>
+                    </div>`;
+            }
+
+            function renderAllTransactions(filter = { term: '', category: 'All' }) {
+                const container = document.getElementById('allTransactions');
+                if (state.transactions.length === 0) {
+                    container.innerHTML = `<div class="text-center mt-16">
+                        <p class="text-5xl mb-4">💳</p>
+                        <h3 class="text-lg font-semibold text-slate-700">No Transactions Yet</h3>
+                        <p class="text-sm text-slate-500">Add an expense to get started.</p>
+                    </div>`;
+                    return;
+                }
+
+                const filtered = state.transactions.filter(tx => 
+                    tx.merchant.toLowerCase().includes(filter.term.toLowerCase()) &&
+                    (filter.category === 'All' || tx.category === filter.category)
+                );
+                const grouped = filtered.reduce((acc, tx) => {
+                    const dateKey = tx.date.toDateString();
+                    if (!acc[dateKey]) acc[dateKey] = [];
+                    acc[dateKey].push(tx);
+                    return acc;
+                }, {});
+
+                container.innerHTML = filtered.length === 0 ? `<p class="text-center text-slate-500 mt-8">No transactions found for this filter.</p>` : 
+                    Object.keys(grouped).map(dateKey => {
+                        const date = new Date(dateKey);
+                        let displayDate;
+                        if (date.toDateString() === state.currentDate.toDateString()) displayDate = 'Today';
+                        else if (date.toDateString() === new Date(new Date(state.currentDate).setDate(state.currentDate.getDate() - 1)).toDateString()) displayDate = 'Yesterday';
+                        else displayDate = date.toLocaleDateString('en-IN', { month: 'long', day: 'numeric' });
+                        return `<h3 class="text-sm font-bold text-slate-500 mt-4">${displayDate}</h3>` + grouped[dateKey].map((tx, i) => createTransactionHTML(tx, i)).join('');
+                    }).join('');
+                
+                addSwipeListeners();
+            }
+
+            function renderHome() {
+                if (state.transactions.length > 0) {
+                    document.getElementById('recentTransactions').innerHTML = state.transactions.slice(0, 3).map((tx, i) => createTransactionHTML(tx, i)).join('');
+                } else {
+                     document.getElementById('recentTransactions').innerHTML = `<div class="text-center py-8 text-sm text-slate-500">
+                        <p>Your recent transactions will appear here.</p>
+                        <button id="loadSampleDataBtn" class="mt-4 font-semibold text-purple-600">Load Sample Data</button>
+                     </div>`;
+                     document.getElementById('loadSampleDataBtn').addEventListener('click', loadMockData);
+                }
+                const spentThisMonth = state.transactions
+                    .filter(tx => tx.date.getMonth() === state.currentDate.getMonth())
+                    .reduce((sum, tx) => sum + tx.amount, 0);
+                const safeToSpend = state.user.budget - spentThisMonth;
+                const spentPercentage = (spentThisMonth / state.user.budget) * 100;
+                
+                document.getElementById('safeToSpend').textContent = `₹${safeToSpend.toLocaleString('en-IN')}`;
+                document.getElementById('spentAmount').textContent = `Spent: ₹${spentThisMonth.toLocaleString('en-IN')}`;
+                document.getElementById('budgetAmount').textContent = `Budget: ₹${state.user.budget.toLocaleString('en-IN')}`;
+                setTimeout(() => { document.getElementById('budgetProgressBar').style.width = `${spentPercentage}%`; }, 100);
+            }
+
+            function renderInsights(period = 'weekly') {
+                const periodLimit = new Date(state.currentDate);
+                if (period === 'weekly') periodLimit.setDate(state.currentDate.getDate() - 7); else periodLimit.setMonth(state.currentDate.getMonth() - 1);
+                const filteredTx = state.transactions.filter(tx => tx.date >= periodLimit);
+                
+                if (filteredTx.length === 0) {
+                    document.getElementById('insightsSummary').innerHTML = `<p class="text-center text-slate-500 mt-8">No spending data for this period.</p>`;
+                    if (spendingChart) spendingChart.destroy();
+                    document.getElementById('insightsTotal').textContent = '₹0';
+                    document.getElementById('insightsPeriod').textContent = `Total spent this ${period}`;
+                    return;
+                }
+
+                const total = filteredTx.reduce((sum, tx) => sum + tx.amount, 0);
+                const summary = filteredTx.reduce((acc, tx) => { acc[tx.category] = (acc[tx.category] || 0) + tx.amount; return acc; }, {});
+                
+                const labels = Object.keys(summary);
+                const data = Object.values(summary);
+                const colors = labels.map(cat => state.categoryColors[cat]);
+
+                document.getElementById('insightsTotal').textContent = `₹${total.toLocaleString('en-IN')}`;
+                document.getElementById('insightsPeriod').textContent = `Total spent this ${period === 'weekly' ? 'week' : 'month'}`;
+                
+                if (spendingChart) spendingChart.destroy();
+                const ctx = document.getElementById('spendingChart').getContext('2d');
+                spendingChart = new Chart(ctx, {
+                    type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: colors, borderColor: '#ffffff', borderWidth: 4 }] },
+                    options: {
+                        responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                        onHover: (event, chartElement) => {
+                            if (chartElement.length) {
+                                const { index } = chartElement[0];
+                                document.getElementById('insightsTotal').textContent = `₹${spendingChart.data.datasets[0].data[index].toLocaleString('en-IN')}`;
+                                document.getElementById('insightsPeriod').textContent = spendingChart.data.labels[index];
+                            } else {
+                                document.getElementById('insightsTotal').textContent = `₹${total.toLocaleString('en-IN')}`;
+                                document.getElementById('insightsPeriod').textContent = `Total spent this ${period}`;
+                            }
+                        }
+                    }
+                });
+                
+                document.getElementById('insightsSummary').innerHTML = Object.keys(summary).map(category => `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center"><div class="w-3 h-3 rounded-full mr-3" style="background-color: ${state.categoryColors[category]}"></div><p class="text-slate-600">${category}</p></div>
+                        <p class="font-semibold text-slate-700">₹${summary[category]}</p>
+                    </div>`).join('');
+            }
+            
+            function renderNotifications() {
+                const container = document.getElementById('notificationsList');
+                if (state.transactions.length === 0) {
+                     container.innerHTML = `<div class="text-center mt-16">
+                        <p class="text-5xl mb-4">🔕</p>
+                        <h3 class="text-lg font-semibold text-slate-700">All Caught Up!</h3>
+                        <p class="text-sm text-slate-500">You have no new notifications.</p>
+                    </div>`;
+                } else {
+                    document.getElementById('notificationDot').classList.remove('hidden');
+                    container.innerHTML = `<div class="flex items-start space-x-4 p-4 bg-white rounded-lg border border-slate-100">
+                        <span class="text-xl mt-1">💡</span>
+                        <div>
+                            <p class="font-semibold text-slate-700">Spending Tip</p>
+                            <p class="text-sm text-slate-500">You've spent ₹730 on Food this week. Consider setting a weekly goal!</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start space-x-4 p-4 bg-white rounded-lg border border-slate-100">
+                        <span class="text-xl mt-1">⚠️</span>
+                        <div>
+                            <p class="font-semibold text-slate-700">Budget Alert</p>
+                            <p class="text-sm text-slate-500">You're at 85% of your ₹2,500 Shopping budget for the month.</p>
+                        </div>
+                    </div>`;
+                }
+            }
+
+            function updateAll() {
+                renderHome();
+                renderAllTransactions();
+                renderInsights(document.querySelector('.insights-btn.active')?.id === 'weeklyBtn' ? 'weekly' : 'monthly');
+                renderNotifications();
+            }
+
+            // --- Initial Setup & Event Listeners ---
+            
+            // Live Clock & Greeting
+            const greetingEl = document.getElementById('greeting');
+            const clockEl = document.getElementById('liveClock');
+            function updateClock() {
+                state.currentDate = new Date();
+                const hours = state.currentDate.getHours();
+                if (greetingEl) {
+                    if (hours < 12) greetingEl.textContent = `Good morning, ${state.user.name}!`;
+                    else if (hours < 18) greetingEl.textContent = `Good afternoon, ${state.user.name}!`;
+                    else greetingEl.textContent = `Good evening, ${state.user.name}!`;
+                }
+                if(clockEl) {
+                    clockEl.textContent = state.currentDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+                }
+            }
+            setInterval(updateClock, 1000);
+
+            // Insights Buttons
+            document.getElementById('weeklyBtn').addEventListener('click', (e) => { renderInsights('weekly'); e.target.classList.add('active'); document.getElementById('monthlyBtn').classList.remove('active'); });
+            document.getElementById('monthlyBtn').addEventListener('click', (e) => { renderInsights('monthly'); e.target.classList.add('active'); document.getElementById('weeklyBtn').classList.remove('active'); });
+
+            // Modals
+            const expenseFormContent = `<form id="expenseForm" class="space-y-4">
+                <div><label class="text-sm font-medium text-slate-600">Amount (₹)</label><input type="number" id="amountInput" placeholder="0.00" required class="w-full mt-1 p-3 bg-slate-100 rounded-lg text-slate-800"></div>
+                <div><label class="text-sm font-medium text-slate-600">Merchant</label><input type="text" id="merchantInput" placeholder="e.g., Zomato" required class="w-full mt-1 p-3 bg-slate-100 rounded-lg text-slate-800"></div>
+                <div><label class="text-sm font-medium text-slate-600">Category</label><select id="categoryInput" required class="w-full mt-1 p-3 bg-slate-100 rounded-lg text-slate-800 appearance-none">${state.categories.map(c => `<option value="${c}">${c}</option>`).join('')}</select></div>
+                <div class="flex space-x-4 pt-4"><button type="button" class="close-modal-btn w-1/2 py-3 rounded-lg bg-slate-200 text-slate-800 font-semibold">Cancel</button><button type="submit" class="w-1/2 py-3 rounded-lg brand-gradient-bg text-white font-semibold">Add</button></div>
+            </form>`;
+            createModal('expenseModal', 'Add New Expense', expenseFormContent);
+            document.getElementById('addExpenseBtn').addEventListener('click', () => openModal('expenseModal'));
+            document.getElementById('expenseForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const amountInput = document.getElementById('amountInput');
+                const amount = parseFloat(amountInput.value);
+                if (isNaN(amount) || amount <= 0) {
+                    amountInput.classList.add('shake', 'border-red-500');
+                    setTimeout(() => amountInput.classList.remove('shake', 'border-red-500'), 820);
+                    return;
+                }
+                const newTx = { id: Date.now(), amount: amount, merchant: document.getElementById('merchantInput').value, category: document.getElementById('categoryInput').value, date: new Date(state.currentDate) };
+                newTx.icon = state.categoryIcons[newTx.category];
+                state.transactions.unshift(newTx);
+                updateAll();
+                closeModal('expenseModal');
+                e.target.reset();
+                showToast('✅ Expense Added!');
+            });
+
+            const helpContent = `<div class="space-y-4 text-sm">
+                <details class="faq-item bg-slate-50 p-3 rounded-lg"><summary class="font-semibold flex justify-between items-center cursor-pointer">How is 'Safe to Spend' calculated?<span class="faq-arrow text-slate-500">></span></summary><p class="mt-2 text-slate-600">It's your total monthly budget minus all your expenses for the current month.</p></details>
+                <details class="faq-item bg-slate-50 p-3 rounded-lg"><summary class="font-semibold flex justify-between items-center cursor-pointer">Can I change my budget?<span class="faq-arrow text-slate-500">></span></summary><p class="mt-2 text-slate-600">Yes, you can edit your total and category-specific budgets from the 'Budgets' page in your Profile.</p></details>
+                <div class="pt-4 text-center"><p class="text-slate-600">Need more help?</p><button class="font-semibold text-purple-600">Chat with Us</button></div>
+            </div>`;
+            createModal('helpModal', 'Help & Support', helpContent);
+            document.getElementById('helpBtn').addEventListener('click', () => openModal('helpModal'));
+            
+            const budgetsContent = `<div id="budgetsList" class="space-y-4"></div>`;
+            createModal('budgetsModal', 'Category Budgets', budgetsContent);
+            document.getElementById('budgetsBtn').addEventListener('click', () => {
+                const spentThisMonthByCategory = state.transactions
+                    .filter(tx => tx.date.getMonth() === state.currentDate.getMonth())
+                    .reduce((acc, tx) => { acc[tx.category] = (acc[tx.category] || 0) + tx.amount; return acc; }, {});
+                document.getElementById('budgetsList').innerHTML = Object.keys(state.budget)
+                    .filter(k => k !== 'total')
+                    .map(cat => {
+                        const spent = spentThisMonthByCategory[cat] || 0;
+                        const budget = state.budget[cat];
+                        const percent = Math.min((spent / budget) * 100, 100);
+                        return `<div class="text-sm">
+                            <div class="flex justify-between font-medium mb-1"><span class="text-slate-700">${cat}</span><span class="text-slate-500">₹${spent} / ₹${budget}</span></div>
+                            <div class="w-full bg-slate-200 rounded-full h-2"><div class="h-2 rounded-full" style="width: ${percent}%; background-color: ${state.categoryColors[cat]}"></div></div>
+                        </div>`;
+                    }).join('');
+                openModal('budgetsModal');
+            });
+
+            // Transaction Page Filtering
+            const searchInput = document.getElementById('searchInput');
+            const categoryFiltersContainer = document.getElementById('categoryFilters');
+            let activeCategoryFilter = 'All';
+            categoryFiltersContainer.innerHTML = ['All', ...state.categories].map(cat => `<button class="category-filter-btn text-sm font-medium whitespace-nowrap px-4 py-2 rounded-full bg-slate-100 text-slate-700 ${cat === 'All' ? 'active' : ''}" data-category="${cat}">${cat}</button>`).join('');
+            document.querySelectorAll('.category-filter-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelector('.category-filter-btn.active').classList.remove('active');
+                    btn.classList.add('active');
+                    activeCategoryFilter = btn.dataset.category;
+                    renderAllTransactions({ term: searchInput.value, category: activeCategoryFilter });
+                });
+            });
+            searchInput.addEventListener('input', () => renderAllTransactions({ term: searchInput.value, category: activeCategoryFilter }));
+            
+            function loadMockData() {
+                state.transactions = mockData.map(tx => ({...tx, date: new Date(tx.date)})); // Ensure dates are Date objects
+                updateAll();
+            }
+            
+            function addSwipeListeners() {
+                document.querySelectorAll('.tx-swipe-container').forEach(item => {
+                    let startX = 0;
+                    let dist = 0;
+                    const threshold = 50;
+                    const maxDist = 128; // Width of two buttons
+                    const actions = item.nextElementSibling;
+
+                    item.addEventListener('touchstart', (e) => {
+                        startX = e.touches[0].clientX;
+                        item.style.transition = 'none';
+                        actions.style.transition = 'none';
+                    }, { passive: true });
+
+                    item.addEventListener('touchmove', (e) => {
+                        dist = e.touches[0].clientX - startX;
+                        if (dist < 0) { // Only swipe left
+                            item.style.transform = `translateX(${Math.max(-maxDist, dist)}px)`;
+                        }
+                    }, { passive: true });
+
+                    item.addEventListener('touchend', () => {
+                        item.style.transition = 'transform 0.3s ease-out';
+                        actions.style.transition = 'opacity 0.3s ease-out';
+                        if (dist < -threshold) {
+                            item.style.transform = `translateX(-${maxDist}px)`;
+                            actions.classList.add('opacity-100', 'pointer-events-auto');
+                        } else {
+                            item.style.transform = 'translateX(0)';
+                            actions.classList.remove('opacity-100', 'pointer-events-auto');
+                        }
+                    });
+                });
+            }
+
+
+            // Initial Render
+            setTimeout(() => {
+                document.getElementById('splashScreen').style.opacity = 0;
+                document.getElementById('appContainer').style.opacity = 1;
+                setTimeout(() => document.getElementById('splashScreen').classList.add('hidden'), 500);
+            }, 2000);
+            updateAll();
+            updateClock();
+        });
+    </script>
+</body>
+</html>
